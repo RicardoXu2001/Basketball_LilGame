@@ -40,7 +40,7 @@ app.innerHTML=`
     <section class="tactics-panel"><div class="panel-heading"><h3>战术板</h3><span class="applied">${icon('check')} 即时生效</span></div><div class="tactic-section-label">进攻战术 <span>OFFENSE</span></div><div class="offense-options">${Object.entries(ATTACKS).map(([key,t],i)=>`<button class="offense-button ${i===1?'selected':''}" data-attack="${key}" title="${t.hint}" aria-pressed="${i===1}"><span class="play-diagram diagram-${i}"><i></i><i></i><i></i><i></i><i></i></span><span><b>${key}</b><small>${t.name}</small></span>${icon('check')}</button>`).join('')}</div><div class="strategy-row"><label>防守策略<select id="defense" aria-label="防守策略">${Object.entries(DEFENSES).map(([key,v])=>`<option value="${key}">${v}</option>`).join('')}</select></label><label>进攻重点<select id="focus" aria-label="进攻重点">${Object.entries(FOCUSES).map(([key,v])=>`<option value="${key}">${v}</option>`).join('')}</select></label></div><div class="tempo-row"><span>比赛节奏</span><div class="tempo-options">${[['Slow','稳扎稳打'],['Balanced','均衡'],['Fast','快速']].map(([k,v])=>`<button data-tempo="${k}" class="${k==='Balanced'?'selected':''}" aria-pressed="${k==='Balanced'}">${v}</button>`).join('')}</div></div></section>
     <section class="events-panel"><div class="panel-heading"><h3>比赛动态 <span class="feed-live"><i></i> LIVE FEED</span></h3><button class="text-button" data-action="stats" title="查看技术统计">数据 ${icon('chevron')}</button></div><div id="event-feed" class="event-feed" tabindex="0" aria-label="比赛事件记录"></div><div class="coach-tip" id="coach-tip">${icon('info')} 挡拆配合：持球人和内线协作。</div></section>
   </div>
-  <footer class="desk-footer"><span><i></i> 你的战术，正在场上发生。</span><span id="footer-tactic">PICK AND ROLL <b> / </b> MAN-TO-MAN</span><span>STREETBALL COACH <b>·</b> PROTOTYPE 01</span></footer>
+  <footer class="desk-footer"><span><i></i> 你的战术，正在场上发生。</span><span id="footer-tactic">PICK AND ROLL <b> / </b> MAN-TO-MAN</span><span>STREETBALL COACH <b>·</b> CLUB EDITION 02</span></footer>
 </section>
 <dialog id="modal"><div id="modal-content"></div></dialog>
 <div id="toast" class="toast" role="status"></div>`;
@@ -64,36 +64,40 @@ class UIController {
     if(el.dataset.speed){e.speed=Number(el.dataset.speed);e.revision++;}
     if(el.dataset.roster){this.filter=el.dataset.roster;this.lastRoster='';this.update();}
     if(el.dataset.player)this.playerDetails(el.dataset.player);
-    if(el.dataset.subIn){const out=document.getElementById('sub-out').value;if(e.substitute(out,el.dataset.subIn)){this.modal.close();this.toast(e.paused?'换人完成':'已排队，将在本回合结束时换人');}else this.toast('无法执行换人，请选择其他球员。');}
+    if(el.dataset.subIn){const out=document.getElementById('sub-out').value;if(e.substitute(out,el.dataset.subIn)){this.modal.close();this.toast(e.paused?'换人完成':'已排队，将在本回合结束时换人');}else this.toast(e.lastSubError||'无法执行换人，请选择其他球员。');}
     const action=el.dataset.action;
     if(action==='pause')e.togglePause();
     if(action==='timeout'){if(e.timeout())this.toast('暂停中 · 调整战术或换人后，点击继续');else this.toast('本场暂停次数已用完');}
-    if(action==='overlay'){court.showTactics=!court.showTactics;el.setAttribute('aria-pressed',court.showTactics);}
+    if(action==='overlay'&&court){court.showTactics=!court.showTactics;el.setAttribute('aria-pressed',court.showTactics);}
+    if(action==='quality'&&court){court.quality=court.quality==='clear'?'retro':'clear';court.resize();el.textContent=court.quality==='clear'?'画质：清晰':'画质：复古';el.setAttribute('aria-pressed',court.quality==='clear');}
     if(action==='sub')this.openSub(el.dataset.out);
-    if(action==='team')this.teamDetails();
+    if(action==='team'){if(!e.started)hub.show('lineup');else this.teamDetails();}
     if(action==='rules')this.info('街区联赛','NEIGHBORHOOD SERIES',`<div class="league-card"><span>RIVERSIDE COURT</span><h3>河畔球场 · 日落对决</h3><p>河畔队 vs 铁街队</p><div class="rule-grid"><div><b>5 v 5</b><span>全场街头篮球</span></div><div><b>4 × 3′</b><span>四节 · 每节三分钟</span></div><div><b>24″</b><span>单回合进攻时间</span></div><div><b>3 次</b><span>球队暂停机会</span></div></div></div><p class="modal-copy">你担任河畔队教练。常规时间打平后进入一分钟加时，直到分出胜负。六次犯规离场。第三节交换半场。这里没有排名压力，先打好眼前的每一个回合。</p>`);
-    if(action==='help')this.info('把场边，变成你的主场。','COACH’S PLAYBOOK',`<div class="help-steps"><div><b>01</b><section><h3>先看比赛</h3><p>金色圆环标记持球人。蓝绿色是你的河畔队，橙色是铁街队。比分、进攻时间和事件会实时更新。</p></section></div><div><b>02</b><section><h3>做出决定</h3><p>点击六种进攻战术，改变跑位与出手倾向。调整防守、进攻重点和节奏，观察下个回合的执行。</p></section></div><div><b>03</b><section><h3>管理体力</h3><p>点击球员查看九项能力。选择替补换人；进行中的换人会在回合结束执行，暂停时立即执行。暂停恢复 9 点体力。</p></section></div></div><div class="keyboard-hint"><kbd>SPACE</kbd> 暂停 / 继续 <span>·</span> <kbd>ESC</kbd> 关闭面板</div>`);
-    if(action==='match'){this.modal.close();document.querySelector('.match-stage').scrollIntoView({behavior:'smooth',block:'start'});}
+    if(action==='help')this.info('把场边，变成你的主场。','COACH’S PLAYBOOK',`<div class="help-steps"><div><b>01</b><section><h3>先看比赛</h3><p>金色圆环标记持球人。蓝绿色是你的河畔队，橙色是铁街队。比分、进攻时间和事件会实时更新。</p></section></div><div><b>02</b><section><h3>做出决定</h3><p>点击六种进攻战术，改变跑位与出手倾向。调整防守、进攻重点和节奏，观察下个回合的执行。</p></section></div><div><b>03</b><section><h3>管理体力</h3><p>点击球员查看五项核心能力与打法适配。选择替补换人；进行中的换人会在回合结束执行，暂停时立即执行。暂停恢复 9 点体力。</p></section></div></div><div class="keyboard-hint"><kbd>SPACE</kbd> 暂停 / 继续 <span>·</span> <kbd>ESC</kbd> 关闭面板</div>`);
+    if(action==='match'){this.modal.close();if(!e.started)hub.show();else document.querySelector('.match-stage').scrollIntoView({behavior:'smooth',block:'start'});}
     if(action==='stats')this.stats();
     if(action==='close')this.modal.close();
-    if(action==='restart')this.info('再来一场？','NEW GAME',`<p class="modal-copy">当前比分、球员状态和战术会重置。夕阳还在，下一场从 0 : 0 开始。</p><button class="primary-button" data-action="confirm-restart">${icon('reset')} 重新开赛</button>`);
-    if(action==='confirm-restart'){e.seed=Date.now();e.reset();court.reset();this.lastRoster='';this.lastRevision=-1;this.modal.close();this.toast('新的比赛开始了。');}
+    if(action==='restart')this.info(e.ended?'回到球队总部':'返回赛前准备？','CLUB HEADQUARTERS',`<p class="modal-copy">${e.ended?'本场经营收入已结算，可以准备下一场比赛。':'本场比赛尚未结束。返回后将重新备战，这场比赛不结算收入。'}</p><button class="primary-button" data-action="return-club">${icon('arrow')} 返回球队总部</button>`);
+    if(action==='return-club'){this.modal.close();hub.show();}
+    if(action==='release-player'){const result=club.release(el.dataset.id);this.modal.close();hub.notify(result);}
+    if(action==='new-club'){Object.assign(club,new ClubModel());hub.save();this.modal.close();hub.show('lineup');this.toast('新俱乐部已建立。');}
     this.update();
   }
   info(title,kicker,body) {document.getElementById('modal-content').innerHTML=`<div class="modal-top"><span class="eyebrow">${kicker}</span><button data-action="close" class="modal-close" aria-label="关闭">${icon('close')}</button></div><h2>${title}</h2>${body}`;if(!this.modal.open)this.modal.showModal();}
   playerDetails(id) {
-    const p=this.engine.teams.flat().find(p=>p.id===id);if(!p)return;
-    const labels={speed:'速度',stamina:'耐力',shooting:'投篮',finishing:'终结',passing:'传球',defense:'防守',rebounding:'篮板',ballHandling:'控球',awareness:'意识'};
-    this.info(p.name,`PLAYER PROFILE / #${p.number}`,`<div class="player-profile"><div class="profile-jersey ${p.team?'away':''}">${p.number}</div><div><span class="player-role">${p.position} · ${p.tag}</span><h3>${p.short}</h3><p>${p.onCourt?'正在场上':'替补席'} · 体力 ${Math.round(p.energy)}% · ${p.fouls} 次犯规</p></div></div><div class="profile-stats">${[['得分',p.points],['助攻',p.assists],['篮板',p.rebounds],['抢断',p.steals]].map(([k,v])=>`<div><b>${v}</b><span>${k}</span></div>`).join('')}</div><div class="attribute-grid">${Object.entries(labels).map(([key,label])=>`<div><label>${label}<b>${p[key]}</b></label><span><i style="width:${p[key]}%"></i></span></div>`).join('')}</div>${!p.team&&p.onCourt&&!this.engine.ended?`<button class="primary-button" data-action="sub" data-out="${id}">${icon('swap')} 为 ${p.short} 安排轮换</button>`:''}`);
+    const p=(this.engine.started?this.engine.teams.flat():[...club.roster,...club.freeAgents]).find(p=>p.id===id);if(!p)return;
+    const labels=CORE_LABELS;
+    this.info(p.name,`PLAYER PROFILE / #${p.number}`,`<div class="player-profile"><div class="profile-jersey ${p.team?'away':''}">${p.number}</div><div><span class="player-role">${p.position} · ${p.primaryStyle}${p.secondaryStyle?' / '+p.secondaryStyle:''}</span><h3>${p.short} <span class="profile-ovr">${p.overall} OVR</span></h3><p>${p.age} 岁 · ${p.height}cm / ${p.weight}kg · 体能 ${Math.round(this.engine.started?p.stamina:p.condition)}%</p></div></div>${this.engine.started?`<div class="profile-stats">${[['得分',p.points],['助攻',p.assists],['篮板',p.rebounds],['抢断',p.steals]].map(([k,v])=>`<div><b>${v||0}</b><span>${k}</span></div>`).join('')}</div>`:''}<div class="attribute-grid five-core">${Object.entries(labels).map(([key,label])=>`<div><label>${label}<b>${p[key]}</b></label><span><i style="width:${p[key]}%"></i></span></div>`).join('')}</div><div class="profile-fit-note"><b>战术适配 ${tacticalFit(p,this.engine.started?this.engine.attack:club.attack)} · ${fitLabel(tacticalFit(p,this.engine.started?this.engine.attack:club.attack))}</b><p>首发能力成本 ${p.attributeCost} · 熟悉度 ${p.familiarity} · 周薪 ${p.salary}K</p><small>OVR 按位置加权计算；具体投篮、控球、篮板等细节由隐藏能力参与模拟。</small></div>${this.engine.started&&!p.team&&p.onCourt&&!this.engine.ended?`<button class="primary-button" data-action="sub" data-out="${id}">${icon('swap')} 为 ${p.short} 安排轮换</button>`:''}`);
   }
   openSub(outId) {
     const e=this.engine,out=e.lineup(0).find(p=>p.id===outId)||e.lineup(0)[0];
-    this.info('让新鲜体力上场。','ROTATION / 换人调整',`<p class="modal-copy">${e.paused?'比赛已暂停，换人立即生效。':'比赛进行中，换人会在本回合结束时执行。'}</p><label class="sub-label">换下球员<select id="sub-out">${e.lineup(0).map(p=>`<option value="${p.id}" ${p===out?'selected':''}>#${p.number} ${p.name} · ${p.position} · 体力 ${Math.round(p.energy)}%</option>`).join('')}</select></label><div class="bench-options">${e.teams[0].filter(p=>!p.onCourt).map(p=>`<button data-sub-in="${p.id}" ${p.fouls>=6?'disabled':''}><span class="mini-jersey">${p.number}</span><span><b>${p.name}</b><small>${p.position} · ${p.tag} · ${p.fouls>=6?'六犯离场':`体力 ${Math.round(p.energy)}%`}</small></span><span>换上 ${icon('arrow')}</span></button>`).join('')}</div>${e.pendingSubs.length?`<p class="modal-copy">已有 ${e.pendingSubs.length} 组换人等待执行。</p>`:''}`);
+    this.info('让新鲜体力上场。','ROTATION / 换人调整',`<p class="modal-copy">${e.paused?'比赛已暂停，换人立即生效。':'比赛进行中，换人会在本回合结束时执行。'}</p><label class="sub-label">换下球员<select id="sub-out">${e.lineup(0).map(p=>`<option value="${p.id}" ${p===out?'selected':''}>#${p.number} ${p.name} · ${p.position} · 体力 ${Math.round(p.stamina)}%</option>`).join('')}</select></label><div class="bench-options">${e.teams[0].filter(p=>!p.onCourt).map(p=>`<button data-sub-in="${p.id}" ${p.fouls>=6?'disabled':''}><span class="mini-jersey">${p.number}</span><span><b>${p.name}</b><small>${p.position} · ${p.tag} · ${p.fouls>=6?'六犯离场':`体力 ${Math.round(p.stamina)}%`}</small></span><span>换上 ${icon('arrow')}</span></button>`).join('')}</div>${e.pendingSubs.length?`<p class="modal-copy">已有 ${e.pendingSubs.length} 组换人等待执行。</p>`:''}`);
   }
-  teamDetails(){const e=this.engine;this.info('河畔队','RIVERSIDE / MY SQUAD',`<p class="modal-copy">八个人，同一片球场。点击姓名查看球员状态和能力。</p><div class="squad-list">${e.teams[0].map(p=>`<button data-player="${p.id}"><span class="mini-jersey">${p.number}</span><span><b>${p.name}</b><small>${p.position} · ${p.tag}</small></span><span class="squad-status">${p.onCourt?'场上':'替补'} · ${Math.round(p.energy)}%</span>${icon('chevron')}</button>`).join('')}</div>`);}
+  teamDetails(){const e=this.engine;this.info('河畔队','RIVERSIDE / MY SQUAD',`<p class="modal-copy">八个人，同一片球场。点击姓名查看球员状态和能力。</p><div class="squad-list">${e.teams[0].map(p=>`<button data-player="${p.id}"><span class="mini-jersey">${p.number}</span><span><b>${p.name}</b><small>${p.position} · ${p.tag}</small></span><span class="squad-status">${p.onCourt?'场上':'替补'} · ${Math.round(p.stamina)}%</span>${icon('chevron')}</button>`).join('')}</div>`);}
   stats(){const e=this.engine;this.info('每个回合，都有记录。','BOX SCORE / 技术统计',`<div class="stats-match"><b>河畔队</b><strong>${e.score[0]} : ${e.score[1]}</strong><b>铁街队</b></div>${e.teams.map((team,i)=>`<h3 class="stats-team-title">${i?'IRON STREET / 铁街队':'RIVERSIDE / 河畔队'}</h3><table class="box-score"><thead><tr><th>球员</th><th>得分</th><th>篮板</th><th>助攻</th><th>投篮</th></tr></thead><tbody>${team.map(p=>`<tr><td><button data-player="${p.id}">#${p.number} ${p.short}</button></td><td>${p.points}</td><td>${p.rebounds}</td><td>${p.assists}</td><td>${p.made}/${p.attempts}</td></tr>`).join('')}</tbody></table>`).join('')}`);}
   update() {
     const e=this.engine;
+    if(e.ended&&!e.settled){club.attack=e.attack;e.settlement=club.completeMatch(e.score,e.teams[0]);e.settled=true;hub.save();}
     document.getElementById('home-score').textContent=String(e.score[0]).padStart(2,'0');document.getElementById('away-score').textContent=String(e.score[1]).padStart(2,'0');
     document.getElementById('period').textContent=e.period>4?`OT${e.period-4}`:`Q${e.period}`;document.getElementById('game-clock').textContent=clockText(e.clock);
     document.getElementById('shot-clock').innerHTML=`${Math.ceil(e.shotClock).toString().padStart(2,'0')}<span>s</span>`;
@@ -121,21 +125,28 @@ class UIController {
     const feed=document.getElementById('event-feed'),oldScroll=feed.scrollTop;
     feed.innerHTML=e.events.map(ev=>`<div class="event ${ev.type}"><time>${ev.time}</time><span class="event-icon">${ev.type==='score'?'+':ev.type==='tactic'?'↗':ev.type==='sub'?'⇄':ev.type==='miss'?'×':ev.type==='rebound'?'↓':'·'}</span><p>${ev.text}</p>${ev.team===0?'<i class="home-event"></i>':''}</div>`).join('');feed.scrollTop=oldScroll;
     const banner=document.getElementById('court-banner');banner.hidden=!e.paused&&!e.result;
-    banner.innerHTML=e.ended?`<span>FINAL WHISTLE</span><b>${e.score[0]>e.score[1]?'拿下这片球场。':'下一场，赢回来。'}</b><p>河畔队 ${e.score[0]} : ${e.score[1]} 铁街队</p><button data-action="confirm-restart">再来一场 ${icon('arrow')}</button>`:e.paused?`<span>TIME TO REGROUP</span><b>比赛已暂停</b><p>看看体力，调整战术。准备好就继续。</p><button data-action="pause">${icon('play')} 继续比赛</button>`:`<span>${e.shot?.three?'FROM DOWNTOWN':'STRAIGHT TO THE RIM'}</span><b>${e.result} ${e.shot?.three?'THREE!':'BUCKET!'}</b>`;
+    banner.innerHTML=e.ended?`<span>FINAL WHISTLE</span><b>${e.score[0]>e.score[1]?'拿下这片球场。':'下一场，赢回来。'}</b><p>河畔队 ${e.score[0]} : ${e.score[1]} 铁街队</p><p>${e.settlement?`本场收入 ${e.settlement.income}K · 薪资 ${e.settlement.expense}K`:''}</p><button data-action="return-club">下一场备战 ${icon('arrow')}</button>`:e.paused?`<span>TIME TO REGROUP</span><b>比赛已暂停</b><p>看看体力，调整战术。准备好就继续。</p><button data-action="pause">${icon('play')} 继续比赛</button>`:`<span>${e.shot?.three?'FROM DOWNTOWN':'STRAIGHT TO THE RIM'}</span><b>${e.result} ${e.shot?.three?'THREE!':'BUCKET!'}</b>`;
   }
   renderRoster() {
     const e=this.engine;document.querySelectorAll('[data-roster]').forEach(b=>{b.classList.toggle('selected',b.dataset.roster===this.filter);b.setAttribute('aria-selected',b.dataset.roster===this.filter);});
+    document.querySelector('[data-roster="court"] span').textContent=String(e.lineup(0).length).padStart(2,'0');document.querySelector('[data-roster="bench"] span').textContent=String(e.teams[0].filter(p=>!p.onCourt).length).padStart(2,'0');
     document.getElementById('lineup-count').textContent=`${e.lineup(0).length} 人在场`;
-    document.getElementById('roster-body').innerHTML=e.teams[0].filter(p=>p.onCourt===(this.filter==='court')).map(p=>`<tr><td><button class="roster-player" data-player="${p.id}"><span class="mini-jersey">${p.number}</span><span><b>${p.name}</b><small>${p.position} <i>·</i> ${p.tag}</small></span></button></td><td><div class="energy"><span><i class="${p.energy<35?'low':''}" style="width:${p.energy}%"></i></span><b>${Math.round(p.energy)}<small>%</small></b></div></td><td class="numeric">${p.points}</td><td class="numeric muted">${p.fouls}</td><td><span class="heat ${p.heat>0?'hot':p.heat<0?'cold':''}">${p.heat>0?'↑ 火热':p.heat<0?'↓ 冷却':'— 稳定'}</span></td></tr>`).join('');
+    document.getElementById('roster-body').innerHTML=e.teams[0].filter(p=>p.onCourt===(this.filter==='court')).map(p=>`<tr><td><button class="roster-player" data-player="${p.id}"><span class="mini-jersey">${p.number}</span><span><b>${p.name}</b><small>${p.position} <i>·</i> ${p.tag}</small></span></button></td><td><div class="energy"><span><i class="${p.stamina<35?'low':''}" style="width:${p.stamina}%"></i></span><b>${Math.round(p.stamina)}<small>%</small></b></div></td><td class="numeric">${p.points}</td><td class="numeric muted">${p.fouls}</td><td><span class="heat ${p.heat>0?'hot':p.heat<0?'cold':''}">${p.heat>0?'↑ 火热':p.heat<0?'↓ 冷却':'— 稳定'}</span></td></tr>`).join('');
   }
 }
-const match=new MatchEngine();
+const club=new ClubModel();let saveNotice='';try{const saved=localStorage.getItem(CLUB_SAVE_KEY);if(saved&&!club.restore(saved))saveNotice='旧存档不可用，已建立新俱乐部。';}catch{saveNotice='浏览器未开放本机存档，本次进度仅保留在当前页面。';}
+const match=new MatchEngine({autoStart:false});
 const ui=new UIController(match);
 let court;
 try {court=new CourtRenderer(document.getElementById('court'),match);}
 catch(error){const panel=document.getElementById('webgl-error');panel.hidden=false;panel.innerHTML='<h2>球场暂时无法显示</h2><p>请使用支持 WebGL 的浏览器，并开启硬件加速后刷新页面。</p>';console.error(error);}
+const hub=new ClubHub(club,match,ui);if(saveNotice){hub.storageWarning=saveNotice;hub.render();}
+document.querySelector('.stage-bottom').insertAdjacentHTML('beforeend','<button class="quality-button" data-action="quality" aria-pressed="true">画质：清晰</button>');
+document.querySelector('.restart-button').setAttribute('aria-label','返回球队总部');document.querySelector('.restart-button').title='返回球队总部';
 let previous=performance.now(),uiElapsed=0;
-function frame(now){const dt=Math.min(.075,(now-previous)/1000);previous=now;match.update(dt);court?.render(dt);uiElapsed+=dt;if(uiElapsed>.14){ui.update();uiElapsed=0;}requestAnimationFrame(frame);}
+function frame(now){const dt=Math.min(.075,(now-previous)/1000);previous=now;if(match.started){match.update(dt);court?.render(dt);uiElapsed+=dt;if(uiElapsed>.14){ui.update();uiElapsed=0;}}requestAnimationFrame(frame);}
 ui.update();requestAnimationFrame(frame);
 // Readable diagnostics for local development and deterministic verification.
-window.streetball={match,ui,get court(){return court;}};
+window.streetball={match,ui,club,hub,get court(){return court;}};
+
+

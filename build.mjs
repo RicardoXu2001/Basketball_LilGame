@@ -6,7 +6,10 @@ const root = process.cwd();
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
 const parts = [
+  'src/motion.js',
   'src/match.js',
+  'src/club.js',
+  'src/hub.js',
   'src/court.js',
   'src/coach.js',
 ];
@@ -16,7 +19,7 @@ const app = parts
   .join('\n');
 
 const three = read('three.min.js');
-const css = read('src/app.css');
+const css = read('src/app.css')+'\n'+read('src/hub.css');
 const tpl = read('src/tpl.html');
 
 // Guard: placeholders must not appear inside the library.

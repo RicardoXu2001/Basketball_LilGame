@@ -1,12 +1,12 @@
 {
   "name": "streetball-coach",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "Offline 3D pixel streetball coaching simulator",
+  "description": "Offline streetball club management and 3D matchday simulator",
   "scripts": {
     "start": "node serve.mjs",
     "build": "node build.mjs",
-    "test": "node --test tests/match.test.cjs",
+    "test": "node --test tests/match.test.cjs tests/club.test.cjs tests/motion.test.cjs",
     "verify": "node qa/verify.mjs"
   }
 }
