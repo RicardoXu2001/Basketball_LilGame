@@ -1,0 +1,24 @@
+# Local browser profiles and previous visual experiments
+.chrome/
+_shots/
+cdp.mjs
+crop.py
+shot.ps1
+patch*.mjs
+src/[0-9]*.js
+
+# Captured runtime evidence stays local; verification tools remain versioned
+qa/evidence/
+qa/verification.json
+qa/QA_REPORT.md
+
+# Local deployment helpers, dependencies, system files and credentials
+.local-*
+node_modules/
+.env
+.env.*
+!.env.example
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
